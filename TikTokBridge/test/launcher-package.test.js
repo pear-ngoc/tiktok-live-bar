@@ -2,8 +2,10 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const packageLib = require('../../scripts/package-lib');
 
 const repositoryRoot = path.join(__dirname, '..', '..');
 const read = fileName => fs.readFileSync(path.join(repositoryRoot, fileName), 'utf8');
@@ -59,5 +61,23 @@ test('POSIX launchers keep their executable bit', { skip: process.platform === '
     for (const fileName of ['run.command', 'run.sh', 'build.sh']) {
         const stats = fs.statSync(path.join(repositoryRoot, fileName));
         assert.ok((stats.mode & 0o111) !== 0, `${fileName} must be executable`);
+    }
+});
+
+test('zipDirectory preserves the package directory while replacing the zip', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tictoc-package-test-'));
+    const source = path.join(root, 'TicToc-Live-test');
+    const archive = path.join(root, 'TicToc-Live-test.zip');
+    try {
+        fs.mkdirSync(source);
+        fs.writeFileSync(path.join(source, 'marker.txt'), 'package contents');
+        fs.writeFileSync(archive, 'stale archive');
+
+        packageLib.zipDirectory(source, archive);
+
+        assert.equal(fs.readFileSync(path.join(source, 'marker.txt'), 'utf8'), 'package contents');
+        assert.ok(fs.statSync(archive).size > 0, 'replacement archive must be created');
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
     }
 });

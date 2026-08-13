@@ -116,7 +116,8 @@ function hasCommand(command) {
 }
 
 function zipDirectory(sourceDir, zipPath) {
-    ensureEmptyDir(path.dirname(zipPath));
+    fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+    fs.rmSync(zipPath, { force: true });
     if (hasCommand('ditto')) {
         // ditto preserves macOS bundle metadata, symlinks and executable bits.
         run('ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', sourceDir, zipPath]);
