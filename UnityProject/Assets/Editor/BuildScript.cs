@@ -43,8 +43,7 @@ namespace TikTokLiveGame.Editor
 
             if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, target))
                 throw new InvalidOperationException(
-                    $"Cannot switch to {target}. Install the matching build support module in Unity Hub " +
-                    "(macOS builds require the macOS module and must run on a Mac).");
+                    $"Cannot switch to {target}. The matching Unity build support module is not installed.");
 
             if (!isMac)
                 CreateTikTokScene.ForceWindowsX64BuildProfile();
@@ -61,13 +60,12 @@ namespace TikTokLiveGame.Editor
             {
                 PlayerSettings.companyName = CompanyName;
                 PlayerSettings.productName = ProductName;
-                // macOS players require IL2CPP; Windows uses it too so both
-                // platforms share one proven backend.
-                PlayerSettings.SetScriptingBackend(namedTarget, ScriptingImplementation.IL2CPP);
+                // CI desktop builds use Mono so they match GameCI's
+                // windows-mono and mac-mono build support images.
+                PlayerSettings.SetScriptingBackend(namedTarget, ScriptingImplementation.Mono2x);
                 PlayerSettings.SetManagedStrippingLevel(namedTarget, ManagedStrippingLevel.Low);
                 PlayerSettings.stripEngineCode = false;
                 PlayerSettings.SetArchitecture(namedTarget, isMac ? ArchitectureUniversal : ArchitectureX64);
-                Debug.Log($"BUILD_ARCHITECTURE={(isMac ? "Universal" : "x64")} readback={PlayerSettings.GetArchitecture(namedTarget)}");
 
                 // Remove stale output so the artifact only contains fresh files.
                 string outputRoot = Path.GetDirectoryName(outputPath);
@@ -86,6 +84,13 @@ namespace TikTokLiveGame.Editor
                     scene => scene.path);
                 if (scenes.Length == 0)
                     throw new InvalidOperationException("No enabled scenes in EditorBuildSettings.");
+
+                Debug.Log(
+                    $"BUILD_CONFIG target={target} " +
+                    $"backend={PlayerSettings.GetScriptingBackend(namedTarget)} " +
+                    $"architecture={(isMac ? "Universal" : "x64")} " +
+                    $"architectureReadback={PlayerSettings.GetArchitecture(namedTarget)} " +
+                    $"output={outputPath}");
 
                 BuildReport report = BuildPipeline.BuildPlayer(scenes, outputPath, target, BuildOptions.CompressWithLz4HC);
                 if (report.summary.result != BuildResult.Succeeded)
