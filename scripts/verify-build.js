@@ -24,7 +24,7 @@ function verifyWindows() {
     check(exists('Build/Windows/TicToc_Live.exe'), 'TicToc_Live.exe exists', 'Build/Windows/TicToc_Live.exe is missing');
     check(exists('Build/Windows/TicToc_Live_Data'), 'TicToc_Live_Data exists', 'Build/Windows/TicToc_Live_Data is missing (Unity runtime data)');
     check(exists('Build/Windows/UnityPlayer.dll'), 'UnityPlayer.dll exists', 'Build/Windows/UnityPlayer.dll is missing');
-    check(exists('Build/Windows/GameAssembly.dll'), 'GameAssembly.dll exists (IL2CPP)', 'Build/Windows/GameAssembly.dll is missing (expected for IL2CPP builds)');
+    check(exists('Build/Windows/MonoBleedingEdge'), 'MonoBleedingEdge runtime exists', 'Build/Windows/MonoBleedingEdge is missing (expected for Mono builds)');
 }
 
 function verifyMacOS() {

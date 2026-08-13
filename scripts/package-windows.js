@@ -17,7 +17,7 @@ const packageName = 'TicToc-Live-Windows-x64';
 const packageDir = path.join(lib.ROOT, 'dist', packageName);
 lib.ensureEmptyDir(packageDir);
 
-// Game files (.exe, _Data, UnityPlayer.dll, GameAssembly.dll...) live at the
+// Game files (.exe, _Data, UnityPlayer.dll, MonoBleedingEdge...) live at the
 // package root, next to run.bat, exactly like the launcher expects.
 lib.copyDirFiltered(gameSourceDir, packageDir, new Set(['.DS_Store']));
 lib.copyBridge(lib.ROOT, packageDir);

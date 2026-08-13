@@ -39,7 +39,8 @@ namespace TikTokLiveGame.Editor
         private static void Run(BuildTarget target)
         {
             bool isMac = target == BuildTarget.StandaloneOSX;
-            string outputPath = Path.GetFullPath(isMac ? MacOSOutputPath : WindowsOutputPath);
+            string relativeOutputPath = isMac ? MacOSOutputPath : WindowsOutputPath;
+            string outputPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", relativeOutputPath));
 
             if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, target))
                 throw new InvalidOperationException(

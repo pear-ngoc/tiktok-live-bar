@@ -32,7 +32,7 @@ macOS Terminal:
 module tương ứng. Nếu Unity không ở vị trí mặc định, đặt `UNITY_PATH` trỏ thẳng
 tới executable của Editor trước khi chạy script.
 
-Build script luôn xóa output cũ của đúng target, dùng IL2CPP, stripping mức Low,
+Build script luôn xóa output cũ của đúng target, dùng Mono, stripping mức Low,
 LZ4HC và dừng với exit code khác 0 khi Unity không tạo đủ output mong đợi.
 
 ## Xác minh output Unity
@@ -42,8 +42,8 @@ node scripts/verify-build.js windows
 node scripts/verify-build.js macos
 ```
 
-Verifier Windows kiểm tra EXE, thư mục `_Data`, `UnityPlayer.dll` và
-`GameAssembly.dll`. Verifier macOS kiểm tra bundle, executable bit, Mach-O và đủ
+Verifier Windows kiểm tra EXE, thư mục `_Data`, `UnityPlayer.dll` và runtime
+`MonoBleedingEdge`. Verifier macOS kiểm tra bundle, executable bit, Mach-O và đủ
 hai kiến trúc `arm64` + `x86_64`.
 
 ## Tạo gói phân phối
