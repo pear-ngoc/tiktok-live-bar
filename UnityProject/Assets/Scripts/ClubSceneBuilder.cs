@@ -33,8 +33,8 @@ namespace TikTokLiveGame
             // CreateArchitecturalBackdrop(); // Hide acoustic wall and panels
 
             Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            string path = @"D:\TIKTOK_LIVE_BAR\LiveAssets\nenamphu.png";
-            if (System.IO.File.Exists(path))
+            string path = LiveAssetPaths.FindFile(System.IO.Path.Combine("LiveAssets", "nenamphu.png"));
+            if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
             {
                 tex.LoadImage(System.IO.File.ReadAllBytes(path));
                 tex.filterMode = FilterMode.Trilinear;
@@ -238,9 +238,9 @@ namespace TikTokLiveGame
             // Thêm Script GifPlayer để tự động phát
             GifPlayer gifPlayer = performer.AddComponent<GifPlayer>();
             
-            string frameDir = System.IO.Path.Combine(Application.dataPath, "../../LiveAssets/DJ_GIF");
-            if (!System.IO.Directory.Exists(frameDir))
-                frameDir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "LiveAssets/DJ_GIF");
+            string frameDir = LiveAssetPaths.FindFolder(System.IO.Path.Combine("LiveAssets", "DJ_GIF"));
+            if (string.IsNullOrEmpty(frameDir))
+                frameDir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "LiveAssets", "DJ_GIF");
             
             gifPlayer.FrameDirectory = frameDir;
             gifPlayer.FrameRate = 30f; // Tốc độ khung hình mượt mà

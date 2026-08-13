@@ -149,7 +149,7 @@ namespace TikTokLiveGame.Editor
             }
         }
 
-        private static void ForceWindowsX64BuildProfile()
+        public static void ForceWindowsX64BuildProfile()
         {
             // Unity 6 Build Profiles can override BuildTarget.StandaloneWindows64
             // with a previously selected x86 architecture. Set the active Windows

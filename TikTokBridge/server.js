@@ -52,8 +52,15 @@ const assetsDir = path.join(__dirname, 'assets');
 const gifsDir = path.join(assetsDir, 'gifs');
 const masterConfigPath = path.join(__dirname, 'config', 'master.json');
 const observedGiftsPath = path.join(__dirname, 'config', 'observed-gifts.json');
-const LIVE_PROVIDER = String(process.env.LIVE_PROVIDER || gameConfig.liveProvider || 'tikfinity').toLowerCase();
+const LIVE_PROVIDER = String(process.env.LIVE_PROVIDER || defaultLiveProvider()).toLowerCase();
 const TIKFINITY_WS_URL = String(process.env.TIKFINITY_WS_URL || gameConfig.tikfinityWsUrl || 'ws://127.0.0.1:21213/');
+
+// TikFinity Desktop only ships for Windows. On other platforms fall back to the
+// direct tiktok-live-connector provider unless the operator opts in explicitly.
+function defaultLiveProvider() {
+    if (process.platform === 'darwin') return 'tiktok';
+    return gameConfig.liveProvider || 'tikfinity';
+}
 
 let liveConnection = null;
 let connectionAttempt = 0;
@@ -129,7 +136,14 @@ app.use('/assets', express.static(assetsDir, staticOptions));
 app.use('/vendor/three', express.static(path.join(__dirname, 'node_modules', 'three', 'build'), staticOptions));
 
 app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', appId: 'ongchu-mmo-live-bridge', version: '1.0.0' });
+    res.json({
+        status: 'ok',
+        appId: 'ongchu-mmo-live-bridge',
+        version: '1.0.0',
+        liveProvider: LIVE_PROVIDER,
+        platform: process.platform,
+        arch: process.arch
+    });
 });
 
 app.get('/api/config', (_req, res) => {
@@ -920,9 +934,9 @@ server.on('error', (err) => {
         console.error(`   Có thể bạn đã chạy server trước đó mà chưa tắt.\n`);
         console.error(`   Cách khắc phục:`);
         console.error(`   1. Tắt cửa sổ cmd/terminal cũ đang chạy server`);
-        console.error(`   2. Hoặc chạy lệnh: npx kill-port ${PORT}`);
+        console.error(`   2. Đóng ứng dụng khác đang dùng cổng ${PORT}`);
         console.error(`   3. Nếu chỉ dùng Control Panel, có thể đổi PORT trong file .env.`);
-        console.error(`      Bản game dựng sẵn cần PORT=3000.\n`);
+        console.error(`      Bản game dựng sẵn cần PORT=3000 (hoặc chạy qua launcher).\n`);
         process.exit(1);
     } else {
         console.error('Lỗi server:', err);

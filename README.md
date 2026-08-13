@@ -25,6 +25,7 @@
 - ⚙️ **Master Rules** — Tùy chỉnh luật game qua giao diện web, không cần code
 - 🧪 **Test Lab** — Demo mode với người xem giả để test trước khi live
 - 🎨 **Chroma Key** — Bấm F2 để bật nền xanh, ghép vào OBS dễ dàng
+- 🖥️ **Desktop đa nền tảng** — Một launcher chung cho Windows và macOS, có health check và log cục bộ
 
 ---
 
@@ -34,9 +35,9 @@
 |-----------|-----------|
 | **Node.js** | ≥ 20.x |
 | **Unity** | Chỉ cần khi tự build source; dùng đúng 6000.2.10f1 |
-| **TikFinity Desktop** | Phiên bản mới nhất |
+| **TikFinity Desktop** | Tùy chọn trên Windows; macOS dùng kết nối TikTok trực tiếp mặc định |
 | **OBS Studio** | Khuyến nghị cho streaming |
-| **Windows** | 10 / 11 (64-bit) |
+| **Hệ điều hành** | Windows 10/11 x64 hoặc macOS Apple Silicon/Intel |
 
 ---
 
@@ -44,24 +45,34 @@
 
 ### Cách nhanh nhất trên Windows
 
-1. Tải [`OngChuMMO-Live-Windows-v1.0.5.zip`](https://github.com/cherry9001/tiktok-live-bar/releases/latest/download/OngChuMMO-Live-Windows-v1.0.5.zip) trong mục **Releases**.
+1. Mở [GitHub Releases](https://github.com/cherry9001/tiktok-live-bar/releases/latest) và tải gói `TicToc-Live-Windows-x64-<version>.zip`.
 2. Giải nén toàn bộ ZIP ra một thư mục mới. Không chạy trực tiếp bên trong ZIP.
 3. Cài [Node.js 20 LTS trở lên](https://nodejs.org/) nếu máy chưa có.
 4. Nhấp đúp `run.bat`. Launcher tự cài thư viện, mở Bridge, Game và Control Panel.
 
+### Cách nhanh nhất trên macOS
+
+1. Mở [GitHub Releases](https://github.com/cherry9001/tiktok-live-bar/releases/latest) và tải gói `TicToc-Live-macOS-Universal-<version>.zip`.
+2. Giải nén toàn bộ ZIP, sau đó nhấp đúp `run.command`; hoặc mở Terminal tại thư mục đã giải nén và chạy `./run.command`.
+3. Nếu gói không kèm `runtime/node`, cài [Node.js 20 LTS trở lên](https://nodejs.org/).
+4. Bản chưa ký có thể bị Gatekeeper chặn lần đầu. Nhấp phải `run.command` hoặc `TicToc_Live.app` → **Open** → **Open**; không tắt Gatekeeper toàn hệ thống.
+
+Gói macOS là Universal (`arm64` + `x86_64`) và mặc định dùng provider `tiktok`,
+không yêu cầu TikFinity. Control Panel hiển thị provider đang hoạt động trên thanh trạng thái.
+
 ### Dấu hiệu cài đặt thành công
 
-Sau khi chạy `run.bat` lần đầu:
+Sau khi chạy launcher lần đầu:
 
 - Cửa sổ **TikTok Bridge** hiển thị địa chỉ `http://127.0.0.1:3000`.
 - Trình duyệt mở Control Panel và logo ÔNG CHÚ MMO hiển thị bình thường.
-- Game mở với cửa sổ `TikTokLiveGameUnity` và báo kết nối Node thành công.
-- Gói Windows đã kèm `Build/DJ_MUSIC/nhacnen.MP3`; có thể thay bằng MP3/WAV/OGG của bạn.
+- Game `TicToc_Live` mở và báo kết nối Node thành công.
+- Có thể thay nội dung trong `DJ_MUSIC`, `DJ_VIDEO` và `LiveAssets` bằng tài nguyên của bạn.
 
 Luồng trên đã được kiểm thử trọn vẹn từ ZIP sạch trên Windows 11: launcher tự
 chạy `npm ci`, Bridge/Control Panel/WebSocket hoạt động và game kết nối cổng 3000.
 
-> `run.bat` không tự tắt chương trình khác đang dùng cổng 3000. Nếu launcher báo
+> Launcher không tự tắt chương trình khác đang dùng cổng 3000. Nếu launcher báo
 > xung đột cổng, hãy đóng đúng chương trình được báo rồi chạy lại để tránh mất dữ liệu.
 
 > **Không tải “Source code (zip)” nếu bạn chỉ muốn chơi.** File source tự động của
@@ -74,14 +85,26 @@ git clone https://github.com/cherry9001/tiktok-live-bar.git
 cd tiktok-live-bar
 ```
 
-Source GitHub không chứa game đã biên dịch. Cài Unity `6000.2.10f1`, sau đó chạy
-`build.bat` hoặc mở `UnityProject/` bằng Unity Hub để tạo thư mục `Build`.
+Source GitHub không chứa game đã biên dịch. Cài Unity `6000.2.10f1` cùng build
+support module tương ứng, sau đó chạy:
+
+```bash
+# Windows x64
+build.bat
+
+# macOS Universal
+./build.sh macos
+```
+
+Có thể đặt `UNITY_PATH` nếu Unity Hub không nằm ở đường dẫn mặc định. Xem hướng
+dẫn build, package và release đầy đủ tại [docs/desktop-build-release.md](docs/desktop-build-release.md).
 
 ### Chạy thủ công — Cài đặt Node Bridge
 
 ```bash
 cd TikTokBridge
-copy .env.example .env
+# Windows: copy .env.example .env
+# macOS/Linux: cp .env.macos.example .env
 npm ci
 npm start
 ```
@@ -92,13 +115,15 @@ Truy cập [http://127.0.0.1:3000/control.html](http://127.0.0.1:3000/control.ht
 
 ### Chạy Unity Game
 
-- **Nếu có file build:** Chạy `run.bat`
-- **Nếu clone source:** Cài Unity `6000.2.10f1`, rồi chạy `build.bat`
+- **Windows:** chạy `run.bat`; nếu clone source, build trước bằng `build.bat`
+- **macOS:** chạy `./run.command`; nếu clone source, build trước bằng `./build.sh macos`
+- **Chỉ chạy Bridge/Control Panel:** thêm `--no-game`; không tự mở browser: thêm `--no-browser`
 
 ### Kết nối TikTok LIVE
 
-1. Mở TikFinity Desktop → đăng nhập → bật LIVE
-2. Trong Control Panel, nhập username TikTok đang live → **Kết nối**
+1. Windows mặc định: mở TikFinity Desktop, đăng nhập và bật LIVE. macOS mặc định
+   kết nối TikTok trực tiếp nên không cần TikFinity.
+2. Trong Control Panel, nhập username TikTok đang live → **Kết nối**.
 
 ---
 
@@ -122,8 +147,14 @@ Truy cập [http://127.0.0.1:3000/control.html](http://127.0.0.1:3000/control.ht
 ├── LiveAssets/             # Hình nền, GIF hiệu ứng
 ├── Build/                 # Có trong gói Release; không có trong source Git
 │
+├── launcher/              # Launcher Node dùng chung Windows/macOS
+├── scripts/               # Verify và đóng gói artifact desktop
+├── .github/workflows/     # CI test, build, package và release
 ├── build.bat              # Script build Unity → EXE
-├── run.bat                # Script chạy Node + Game
+├── build.sh               # Script build Unity desktop trên macOS
+├── run.bat                # Launcher Windows
+├── run.command            # Launcher double-click trên macOS
+├── run.sh                 # Launcher từ Terminal
 ├── LICENSE                # Giấy phép MIT
 └── README.md              # File này
 ```
@@ -168,6 +199,9 @@ Truy cập [http://127.0.0.1:3000/control.html](http://127.0.0.1:3000/control.ht
 - **Video nền:** Thả file `.mp4`, `.mov`, `.webm` hoặc ảnh `.png`, `.jpg` vào `DJ_VIDEO/`
 - Game tự phát lặp và tắt tiếng video
 
+Game tìm các thư mục này cạnh package/app và trong thư mục dữ liệu bền vững của
+người dùng, nên nội dung tùy chỉnh vẫn dùng được với layout Windows và macOS.
+
 > ⚠️ Hãy sử dụng nhạc và video có bản quyền hợp lệ.
 
 ---
@@ -194,9 +228,13 @@ TIKFINITY_WS_URL=ws://127.0.0.1:21213/
 ALLOW_LAN=0
 ```
 
-Bridge thực sự nạp file `.env` khi khởi động. Biến môi trường của Windows được ưu
-tiên nếu cùng tên. Bản game dựng sẵn kết nối cố định tới cổng `3000`; chỉ đổi
-`PORT` khi bạn dùng riêng Control Panel/Bridge hoặc đã tự build lại Unity client.
+Bridge thực sự nạp file `.env` khi khởi động và biến môi trường của hệ điều hành
+được ưu tiên nếu cùng tên. Windows mặc định dùng `tikfinity`; macOS mặc định dùng
+`tiktok`. Dùng `TikTokBridge/.env.macos.example` làm mẫu trên macOS.
+
+Khi chạy qua launcher, game nhận host/port tùy chỉnh bằng `--bridge-url`, nên có
+thể đổi `PORT` mà không cần build lại game. Khi chạy game trực tiếp, có thể đặt
+`bridge.json` cạnh package với nội dung `{"bridgeUrl":"ws://127.0.0.1:3001"}`.
 
 ### Xử lý lỗi cài đặt thường gặp
 
@@ -205,7 +243,11 @@ tiên nếu cùng tên. Bản game dựng sẵn kết nối cố định tới c
 - **Cổng 3000 đang bị chiếm:** đóng đúng ứng dụng/PID được launcher báo; launcher không tự tắt ứng dụng khác.
 - **Không tìm thấy game:** bạn đã tải Source ZIP hoặc clone Git. Hãy tải bản Windows trong Releases hoặc tự build bằng Unity.
 - **Windows SmartScreen cảnh báo:** chọn **More info → Run anyway** nếu file được tải từ Release chính thức của repo này.
-- **TikTok chưa có sự kiện:** mở TikFinity, kiểm tra WebSocket `ws://127.0.0.1:21213/`, sau đó thử **Test Lab** trước.
+- **macOS báo không thể xác minh nhà phát triển:** nhấp phải app hoặc `run.command` → **Open**, hoặc vào **Privacy & Security → Open Anyway**; không tắt Gatekeeper toàn hệ thống.
+- **Không thấy game nhưng Bridge vẫn chạy:** kiểm tra `Build/Windows/TicToc_Live.exe` hoặc `Build/macOS/TicToc_Live.app`; xem `logs/launcher.log` và `logs/bridge.log`.
+- **TikTok chưa có sự kiện:** xem badge provider trên Control Panel. Với TikFinity,
+  kiểm tra WebSocket `ws://127.0.0.1:21213/`; với kết nối trực tiếp, kiểm tra đúng
+  username đang LIVE. Sau đó thử **Test Lab** để tách lỗi game khỏi nguồn sự kiện.
 
 ---
 
@@ -213,10 +255,12 @@ tiên nếu cùng tên. Bản game dựng sẵn kết nối cố định tới c
 
 ```bash
 cd TikTokBridge
-npm test                    # Chạy unit tests
-npm run security:smoke      # Test bảo mật WebSocket
+npm test                    # Syntax check + unit/runtime tests
+npm run security:smoke      # Chạy khi Bridge đang hoạt động trên PORT đã cấu hình
 ```
 
+Kiểm tra build desktop bằng `node scripts/verify-build.js windows|macos`. Chi tiết
+và checklist release nằm trong [docs/desktop-build-release.md](docs/desktop-build-release.md).
 Hoặc dùng **Test Lab** trong Control Panel để tạo người xem giả.
 
 ---

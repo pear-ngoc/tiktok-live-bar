@@ -1,0 +1,279 @@
+name: Build Desktop
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a release build that is already running.
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test-bridge:
+    name: Test Node Bridge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: TikTokBridge/package-lock.json
+
+      - name: Install dependencies
+        working-directory: TikTokBridge
+        run: npm ci
+
+      - name: Run tests
+        working-directory: TikTokBridge
+        run: npm test
+
+      - name: Start bridge for smoke test
+        working-directory: TikTokBridge
+        run: |
+          node server.js > bridge-ci.log 2>&1 &
+          echo $! > bridge-ci.pid
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "Bridge is healthy."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Bridge did not become healthy in time."
+          cat bridge-ci.log || true
+          exit 1
+
+      - name: Security smoke test
+        working-directory: TikTokBridge
+        run: npm run security:smoke
+
+      - name: Stop bridge
+        if: always()
+        working-directory: TikTokBridge
+        run: |
+          if [ -f bridge-ci.pid ]; then kill "$(cat bridge-ci.pid)" 2>/dev/null || true; fi
+          tail -n 20 bridge-ci.log 2>/dev/null || true
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: test-bridge
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            targetPlatform: StandaloneWindows64
+            artifact: TicToc-Live-Windows-x64
+            buildMethod: TikTokLiveGame.Editor.BuildScript.BuildWindows64
+          - platform: macos
+            targetPlatform: StandaloneOSX
+            artifact: TicToc-Live-macOS-Universal
+            buildMethod: TikTokLiveGame.Editor.BuildScript.BuildMacOS
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Unity Library cache
+        uses: actions/cache@v4
+        with:
+          path: UnityProject/Library
+          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('UnityProject/ProjectSettings/ProjectVersion.txt', 'UnityProject/Packages/manifest.json', 'UnityProject/Packages/packages-lock.json', 'UnityProject/ProjectSettings/ProjectSettings.asset') }}
+          restore-keys: |
+            Library-${{ matrix.targetPlatform }}-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: TikTokBridge/package-lock.json
+
+      - name: Compute release version
+        id: meta
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "version=ci-${GITHUB_SHA::7}" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Build with Unity
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: UnityProject
+          unityVersion: auto
+          targetPlatform: ${{ matrix.targetPlatform }}
+          buildMethod: ${{ matrix.buildMethod }}
+
+      - name: Verify Unity output
+        run: node scripts/verify-build.js ${{ matrix.platform }}
+
+      - name: Install bridge dependencies for bundling
+        working-directory: TikTokBridge
+        run: npm ci
+
+      - name: Package distribution
+        run: node scripts/package-${{ matrix.platform }}.js --version "${{ steps.meta.outputs.version }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}-${{ steps.meta.outputs.version }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  sign-macos:
+    name: Sign & notarize macOS
+    needs: build
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: macos-latest
+    env:
+      MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+    steps:
+      - name: Check certificate secrets
+        id: gate
+        run: |
+          if [ -n "${MACOS_CERTIFICATE_P12}" ] && [ -n "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" ] \
+            && [ -n "${{ secrets.APPLE_TEAM_ID }}" ] && [ -n "${{ secrets.APPLE_ID }}" ] \
+            && [ -n "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" ]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Signing secrets are not configured; shipping the unsigned artifact."
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Download macOS artifact
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: TicToc-Live-macOS-Universal-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Sign, notarize and repackage
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          zips=(artifacts/*.zip)
+          if [ "${#zips[@]}" -ne 1 ]; then
+            echo "Expected exactly one macOS artifact zip, found ${#zips[@]}." >&2
+            exit 1
+          fi
+          source_zip="${zips[0]}"
+          base_name="$(basename "$source_zip" .zip)"
+          work_dir="${RUNNER_TEMP}/macos-dist"
+          mkdir -p "$work_dir"
+          ditto -x -k "$source_zip" "$work_dir"
+          dist_dir="$(find "$work_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          app_path="$dist_dir/TicToc_Live.app"
+          [ -d "$app_path" ] || { echo "TicToc_Live.app missing inside artifact." >&2; exit 1; }
+
+          cert_path="${RUNNER_TEMP}/certificate.p12"
+          keychain_path="${RUNNER_TEMP}/tictoc-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "${MACOS_CERTIFICATE_P12}" | base64 --decode > "$cert_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$cert_path" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain_path"
+          security list-keychain -d user -s "$keychain_path" login.keychain-db
+
+          identity="$(security find-identity -v -p codesigning "$keychain_path" | head -n 1 | sed -E 's/^[0-9]+\) [A-F0-9]+ \"(.*)\"$/\1/')"
+          [ -n "$identity" ] || { echo "No codesigning identity found in the certificate." >&2; exit 1; }
+          echo "Signing with identity: $identity"
+          codesign --force --deep --options runtime --timestamp --sign "$identity" "$app_path"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+
+          notarize_zip="${RUNNER_TEMP}/TicToc_Live-notarize.zip"
+          ditto -c -k --keepParent "$app_path" "$notarize_zip"
+          xcrun notarytool submit "$notarize_zip" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait
+          xcrun stapler staple "$app_path"
+          spctl --assess --type execute --verbose=2 "$app_path" || true
+
+          signed_zip="$(dirname "$source_zip")/${base_name}-signed.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$dist_dir" "$signed_zip"
+          echo "Signed artifact: $signed_zip"
+
+      - name: Upload signed artifact
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TicToc-Live-macOS-Universal-${{ github.ref_name }}-signed
+          path: artifacts/*.zip
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: [test-bridge, build, sign-macos]
+    if: |
+      github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+      && needs.test-bridge.result == 'success'
+      && needs.build.result == 'success'
+      && (needs.sign-macos.result == 'success' || needs.sign-macos.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          # If a signed macOS zip exists, prefer it over the unsigned twin.
+          for signed in artifacts/**/*-signed.zip; do
+            unsigned="${signed/-signed.zip/.zip}"
+            if [ -f "$unsigned" ]; then
+              echo "Replacing unsigned macOS artifact with the signed one."
+              rm -f "$unsigned"
+            fi
+          done
+          files=(artifacts/**/*.zip)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release artifacts were produced." >&2
+            exit 1
+          fi
+          printf 'Attaching:\n'
+          printf '  %s\n' "${files[@]}"
+          if gh release view "${GITHUB_REF_NAME}" > /dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes
+          fi

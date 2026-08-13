@@ -282,3 +282,15 @@ document.querySelectorAll('[data-action]').forEach(btn => {
 
 /* ═══ INIT ═══════════════════════════════════════════════ */
 connectSocket();
+
+fetch('/api/health')
+    .then(response => (response.ok ? response.json() : null))
+    .then(health => {
+        const badge = document.getElementById('provider-badge');
+        if (!badge || !health || !health.liveProvider) return;
+        badge.textContent = health.liveProvider === 'tikfinity'
+            ? 'Nguồn live: TikFinity'
+            : 'Nguồn live: TikTok trực tiếp';
+        badge.hidden = false;
+    })
+    .catch(() => {});

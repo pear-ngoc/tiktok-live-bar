@@ -168,18 +168,10 @@ namespace TikTokLiveGame
 
         private static string FindVideoPath()
         {
-            string buildRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            string projectRoot = Directory.GetParent(buildRoot)?.FullName ?? buildRoot;
-            string workspaceRoot = Directory.GetParent(projectRoot)?.FullName ?? projectRoot;
-            string[] folders =
-            {
-                Path.Combine(buildRoot, "DJ_VIDEO"),
-                Path.Combine(workspaceRoot, "DJ_VIDEO"),
-                Application.streamingAssetsPath
-            };
             string[] extensions = { ".mp4", ".mov", ".m4v", ".webm" };
-            foreach (string folder in folders)
+            foreach (string root in LiveAssetPaths.CandidateRoots())
             {
+                string folder = Path.Combine(root, "DJ_VIDEO");
                 if (!Directory.Exists(folder)) continue;
                 string file = Directory.EnumerateFiles(folder)
                     .FirstOrDefault(candidate => extensions.Contains(Path.GetExtension(candidate), StringComparer.OrdinalIgnoreCase));
@@ -190,18 +182,10 @@ namespace TikTokLiveGame
 
         private static string[] FindImagePaths()
         {
-            string buildRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            string projectRoot = Directory.GetParent(buildRoot)?.FullName ?? buildRoot;
-            string workspaceRoot = Directory.GetParent(projectRoot)?.FullName ?? projectRoot;
-            string[] folders =
-            {
-                Path.Combine(buildRoot, "DJ_VIDEO"),
-                Path.Combine(workspaceRoot, "DJ_VIDEO"),
-                Application.streamingAssetsPath
-            };
             string[] extensions = { ".png", ".jpg", ".jpeg" };
-            foreach (string folder in folders)
+            foreach (string root in LiveAssetPaths.CandidateRoots())
             {
+                string folder = Path.Combine(root, "DJ_VIDEO");
                 if (!Directory.Exists(folder)) continue;
                 string[] files = Directory.EnumerateFiles(folder)
                     .Where(candidate => extensions.Contains(Path.GetExtension(candidate), StringComparer.OrdinalIgnoreCase))

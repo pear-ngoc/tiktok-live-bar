@@ -32,8 +32,50 @@ namespace TikTokLiveGame
                 return;
             }
             instance = this;
+            serverUrl = ResolveServerUrl(serverUrl);
             lifetime = new CancellationTokenSource();
             supervisor = RunConnectionSupervisorAsync(lifetime.Token);
+        }
+
+        private static string ResolveServerUrl(string fallback)
+        {
+            try
+            {
+                foreach (string arg in Environment.GetCommandLineArgs())
+                {
+                    if (!arg.StartsWith("--bridge-url=", StringComparison.OrdinalIgnoreCase)) continue;
+                    string value = arg.Substring("--bridge-url=".Length).Trim();
+                    if (IsWebSocketUrl(value, out Uri cliUri)) return cliUri.ToString();
+                }
+
+                string configFile = LiveAssetPaths.FindFile("bridge.json");
+                if (!string.IsNullOrEmpty(configFile))
+                {
+                    BridgeFileConfig config = JsonUtility.FromJson<BridgeFileConfig>(File.ReadAllText(configFile));
+                    if (config != null && IsWebSocketUrl(config.bridgeUrl, out Uri fileUri)) return fileUri.ToString();
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"Bridge config could not be read: {exception.Message}");
+            }
+            return fallback;
+        }
+
+        private static bool IsWebSocketUrl(string value, out Uri uri)
+        {
+            uri = null;
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out Uri candidate)) return false;
+            if (candidate.Scheme != "ws" && candidate.Scheme != "wss") return false;
+            uri = candidate;
+            return true;
+        }
+
+        [Serializable]
+        private sealed class BridgeFileConfig
+        {
+            public string bridgeUrl = "";
         }
 
         private void Update()
