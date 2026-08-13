@@ -227,7 +227,7 @@ namespace TikTokLiveGame
         {
             GUI.Box(new Rect(18, 84, 365, 320), GUIContent.none, panelStyle);
             
-            GUIStyle activeTab = new GUIStyle(buttonStyle) { normal = { background = buttonHover, textColor = Color.yellow } };
+            GUIStyle activeTab = new GUIStyle(buttonStyle) { normal = { background = buttonStyle.hover.background, textColor = Color.yellow } };
             if (GUI.Button(new Rect(34, 96, 155, 32), "KẾT NỐI & DEMO", controlTab == 0 ? activeTab : buttonStyle)) controlTab = 0;
             if (GUI.Button(new Rect(195, 96, 169, 32), "THÊM KHÁCH VIP", controlTab == 1 ? activeTab : buttonStyle)) controlTab = 1;
 

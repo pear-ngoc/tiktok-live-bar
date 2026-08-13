@@ -1,4 +1,5 @@
 using UnityEngine;
+using TikTokLiveBar;
 
 namespace TikTokLiveGame
 {
@@ -281,7 +282,6 @@ namespace TikTokLiveGame
                 l.cullingMask = -1; 
                 DiscoLight disco = obj.AddComponent<DiscoLight>();
                 disco.index = i;
-                discoLights.Add(disco);
             }
         }
 
